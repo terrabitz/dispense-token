@@ -1,5 +1,5 @@
 const core = require('@actions/core');
-const httpm = require("@actions/http-client")
+const {HttpClient} = require("@actions/http-client")
 
 
 // most @actions toolkit packages have async methods
@@ -38,8 +38,8 @@ async function run() {
     const url = `https://${hostname}/token`
     core.debug(`requesting token; url=${url} repo=${repo} permissions=${JSON.stringify(permsMap)}`)
 
-    const client = new httpm.HttpClient('github-actions');
-    const res = await client.post(url, payload);
+    const client = new HttpClient('terrabitz-dispense-token');
+    const res = await client.postJson(url, payload);
     const body = await res.readBody();
     if (res.message.statusCode != 200) {
       const errMessage = JSON.parse(body)
