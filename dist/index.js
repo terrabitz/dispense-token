@@ -2833,7 +2833,7 @@ var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
 const core = __nccwpck_require__(186);
-const httpClient = __nccwpck_require__(255)
+const httpm = __nccwpck_require__(255)
 
 
 // most @actions toolkit packages have async methods
@@ -2869,9 +2869,11 @@ async function run() {
       permissions: permsMap,
     };
 
-    core.debug(`requesting token; hostname=${hostname} repo=${repo} permissions=${JSON.stringify(permsMap)}`)
-    const client = new httpClient.HttpClient();
-    const res = await client.post(`https://${hostname}/token`, payload);
+    const url = `https://${hostname}/token`
+    core.debug(`requesting token; url=${url} repo=${repo} permissions=${JSON.stringify(permsMap)}`)
+
+    const client = new httpm.HttpClient('github-actions');
+    const res = await client.post(url, payload);
     const body = await res.readBody();
     if (res.message.statusCode != 200) {
       const errMessage = JSON.parse(body)
