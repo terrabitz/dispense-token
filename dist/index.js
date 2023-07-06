@@ -1726,6 +1726,10 @@ function checkBypass(reqUrl) {
     if (!reqUrl.hostname) {
         return false;
     }
+    const reqHost = reqUrl.hostname;
+    if (isLoopbackAddress(reqHost)) {
+        return true;
+    }
     const noProxy = process.env['no_proxy'] || process.env['NO_PROXY'] || '';
     if (!noProxy) {
         return false;
@@ -1751,13 +1755,24 @@ function checkBypass(reqUrl) {
         .split(',')
         .map(x => x.trim().toUpperCase())
         .filter(x => x)) {
-        if (upperReqHosts.some(x => x === upperNoProxyItem)) {
+        if (upperNoProxyItem === '*' ||
+            upperReqHosts.some(x => x === upperNoProxyItem ||
+                x.endsWith(`.${upperNoProxyItem}`) ||
+                (upperNoProxyItem.startsWith('.') &&
+                    x.endsWith(`${upperNoProxyItem}`)))) {
             return true;
         }
     }
     return false;
 }
 exports.checkBypass = checkBypass;
+function isLoopbackAddress(host) {
+    const hostLower = host.toLowerCase();
+    return (hostLower === 'localhost' ||
+        hostLower.startsWith('127.') ||
+        hostLower.startsWith('[::1]') ||
+        hostLower.startsWith('[0:0:0:0:0:0:0:1]'));
+}
 //# sourceMappingURL=proxy.js.map
 
 /***/ }),
@@ -2688,23 +2703,6 @@ exports["default"] = _default;
 
 /***/ }),
 
-/***/ 258:
-/***/ ((module) => {
-
-let wait = function (milliseconds) {
-  return new Promise((resolve) => {
-    if (typeof milliseconds !== 'number') {
-      throw new Error('milliseconds not a number');
-    }
-    setTimeout(() => resolve("done!"), milliseconds)
-  });
-};
-
-module.exports = wait;
-
-
-/***/ }),
-
 /***/ 491:
 /***/ ((module) => {
 
@@ -2835,20 +2833,48 @@ var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
 const core = __nccwpck_require__(186);
-const wait = __nccwpck_require__(258);
+const httpClient = __nccwpck_require__(255)
 
 
 // most @actions toolkit packages have async methods
 async function run() {
   try {
-    const ms = core.getInput('milliseconds');
-    core.info(`Waiting ${ms} milliseconds ...`);
+    const hostname = core.getInput('hostname');
+    const repo = core.getInput('repo');
+    const permissions = core.getInput('permissions');
 
-    core.debug((new Date()).toTimeString()); // debug is only output if you set the secret `ACTIONS_RUNNER_DEBUG` to true
-    await wait(parseInt(ms));
-    core.info((new Date()).toTimeString());
+    let oidcToken
+    try {
+      oidcToken = await core.getIDToken();
+    } catch (e) {
+      throw new Error("unable to get OIDC token; make sure you have 'id-token: write' permissions enabled on your workflow")
+    }
 
-    core.setOutput('time', new Date().toTimeString());
+    const splitPerms = permissions.split("\n");
+    const permsMap = {};
+    splitPerms.forEach(perm => {
+      const splitPerm = perm.split(": ", 2)
+      const resource = splitPerm[0]
+      const accessLevel = splitPerm[1]
+      permsMap[resource] = accessLevel
+    });
+
+    const payload = {
+      repo,
+      token: oidcToken,
+      permissions: permsMap,
+    };
+
+    const client = new httpClient.HttpClient();
+    const res = await client.post(`https://${hostname}/token`, payload);
+    const body = await res.readBody();
+    if (res.message.statusCode != 200) {
+      const errMessage = JSON.parse(body)
+      throw new Error(errMessage.error)
+    }
+
+    core.setSecret(body)
+    core.setOutput("token", body)
   } catch (error) {
     core.setFailed(error.message);
   }

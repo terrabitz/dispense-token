@@ -1,18 +1,46 @@
 const core = require('@actions/core');
-const wait = require('./wait');
+const httpClient = require("@actions/http-client")
 
 
 // most @actions toolkit packages have async methods
 async function run() {
   try {
-    const ms = core.getInput('milliseconds');
-    core.info(`Waiting ${ms} milliseconds ...`);
+    const hostname = core.getInput('hostname');
+    const repo = core.getInput('repo');
+    const permissions = core.getInput('permissions');
 
-    core.debug((new Date()).toTimeString()); // debug is only output if you set the secret `ACTIONS_RUNNER_DEBUG` to true
-    await wait(parseInt(ms));
-    core.info((new Date()).toTimeString());
+    let oidcToken
+    try {
+      oidcToken = await core.getIDToken();
+    } catch (e) {
+      throw new Error("unable to get OIDC token; make sure you have 'id-token: write' permissions enabled on your workflow")
+    }
 
-    core.setOutput('time', new Date().toTimeString());
+    const splitPerms = permissions.split("\n");
+    const permsMap = {};
+    splitPerms.forEach(perm => {
+      const splitPerm = perm.split(": ", 2)
+      const resource = splitPerm[0]
+      const accessLevel = splitPerm[1]
+      permsMap[resource] = accessLevel
+    });
+
+    const payload = {
+      repo,
+      token: oidcToken,
+      permissions: permsMap,
+    };
+
+    const client = new httpClient.HttpClient();
+    const res = await client.post(`https://${hostname}/token`, payload);
+    const body = await res.readBody();
+    if (res.message.statusCode != 200) {
+      const errMessage = JSON.parse(body)
+      throw new Error(errMessage.error)
+    }
+
+    core.setSecret(body)
+    core.setOutput("token", body)
   } catch (error) {
     core.setFailed(error.message);
   }
