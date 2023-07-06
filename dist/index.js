@@ -2869,6 +2869,7 @@ async function run() {
       permissions: permsMap,
     };
 
+    core.debug(`requesting token; hostname=${hostname} repo=${repo} permissions=${JSON.stringify(permsMap)}`)
     const client = new httpClient.HttpClient();
     const res = await client.post(`https://${hostname}/token`, payload);
     const body = await res.readBody();
