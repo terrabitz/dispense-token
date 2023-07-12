@@ -1,5 +1,5 @@
 const core = require('@actions/core');
-const {HttpClient} = require("@actions/http-client")
+const {HttpClient, HttpClientError} = require("@actions/http-client")
 
 
 // most @actions toolkit packages have async methods
