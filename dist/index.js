@@ -2841,7 +2841,11 @@ async function run() {
   try {
     const hostname = core.getInput('hostname');
     const repo = core.getInput('repo');
-    const permissions = core.getInput('permissions');
+    const permissions = core.getMultilineInput('permissions').reduce((result, scopePermission) => {
+      const [scope, permission] = scopePermission.split(':').map(it => it.trim())
+      result[scope] = permission
+      return result
+  }, {})
 
     let oidcToken
     try {
@@ -2850,23 +2854,11 @@ async function run() {
       throw new Error("unable to get OIDC token; make sure you have 'id-token: write' permissions enabled on your workflow")
     }
 
-    const permsMap = {};
-    permissions.split("\n").forEach(perm => {
-      const trimmed = perm.trim()
-      if (trimmed === ""){
-        return
-      }
-
-      const split = perm.split(": ", 2)
-      const resource = split[0]
-      const accessLevel = split[1]
-      permsMap[resource] = accessLevel
-    });
 
     const payload = {
       repo,
       token: oidcToken,
-      permissions: permsMap,
+      permissions: permissions,
     };
 
     const url = `https://${hostname}/token`
