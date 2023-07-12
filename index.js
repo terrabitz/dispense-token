@@ -28,18 +28,26 @@ async function run() {
     };
 
     const url = `https://${hostname}/token`
-    core.debug(`requesting token; url=${url} repo=${repo} permissions=${JSON.stringify(permsMap)}`)
+    core.info(`requesting token; url=${url} repo=${repo} permissions=${JSON.stringify(permsMap)}`)
 
     const client = new HttpClient('terrabitz-dispense-token');
-    const res = await client.postJson(url, payload);
-    const body = await res.readBody();
-    if (res.message.statusCode != 200) {
-      const errMessage = JSON.parse(body)
-      throw new Error(errMessage.error)
-    }
+    const token = await client.postJson(url, payload).then(res => {
+      if (res.statusCode >= 400) {
+        core.error(res.result)
+        throw new Error(`hostname: ${hostname} statusCode: ${res.statusCode} message:${res.result.json.error}`)
+      }
 
-    core.setSecret(body)
-    core.setOutput("token", body)
+      return res.result
+    }).catch(err => {
+        if (err instanceof HttpClientError && err.result?.error?.message) {
+            throw new Error(err.result.error.message)
+        }
+
+        throw err
+    })
+
+    core.setSecret(token)
+    core.setOutput("token", token)
   } catch (error) {
     core.setFailed(error.message);
   }
