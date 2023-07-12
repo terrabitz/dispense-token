@@ -2862,7 +2862,7 @@ async function run() {
     };
 
     const url = `https://${hostname}/token`
-    core.info(`requesting token; url=${url} repo=${repo} permissions=${JSON.stringify(permsMap)}`)
+    core.info(`requesting token; url=${url} repo=${repo} permissions=${JSON.stringify(permissions)}`)
 
     const client = new HttpClient('terrabitz-dispense-token');
     const token = await client.postJson(url, payload).then(res => {
